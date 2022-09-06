@@ -61,3 +61,51 @@ y <- sqrt(r_squared) * sin(angle)
 
 plot(disc(radius)); points(x,y)
 ```
+
+### Quadrant count test for uniformity
+
+Humans tend to see patterns in random arrangements, so we need statistical tests.
+
+It can be used to check if points are completely spatially random, That is they are uniformly random throughout the area of interest.
+
+Quadrat count tests tests are implemented using `quadrat.test()` which takes a planar point pattern, `ppp()` object. "Planar point pattern" is jargon for a set of points in a region of a 2D plane.
+
+```{r}
+# list variable that have already been defined
+ls.str()
+
+ppxy <- ppp(x = x, y = y, window = disc(radius))
+
+qt <- quadrat.test(ppxy)
+plot(qt)
+print(qt)
+```
+
+### Creating a uniform point pattern with spatstat
+
+A Poison point process creates events according to a Poison distribution with an intensity parameter specifying the expected events per unit area.
+
+The total number of events generated is a single number from a Poisson distribution, so the multiple realizations of the same process can easily have different numbers of events.
+
+In the previous exercise you used a set of 300 events scattered uniformly within a circle. If you repeated the generation of the events again you will still have 300 of them, but in different locations. The dataset of exactly 300 points is from a Poisson point process *conditioned on the total being 300*.
+
+The spatstat package can generate Poisson spatial processes with the `rpoisonp()` function given an intensity and a window that a re not conditioned on the total.
+
+Just as the random number generator functions in R start with an r, most of the random point pattern functions in spatstat start with an "r".
+
+The `area()` function of spatstat will compute the area of a window such as a disc.
+
+```{r}
+# create a disc of radius 10
+disc10 <- disc(10)
+
+# to generate approximately 500 points in a disc of radius 10, set lambda tp 500 divided by the area of of the disc
+
+lambda <- 500/area(disc10)
+
+# create a point pattern object
+
+ppois <- rpoispp(lambda = lambda, win = disc10)
+
+plot(ppois)
+```

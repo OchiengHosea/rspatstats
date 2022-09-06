@@ -137,3 +137,15 @@ plot(p_regular)
 quadrat.test(p_cluster, alternative="clustered")
 quadrat.test(p_regular,, alternative = "regular")
 ```
+
+### Nearest neighbor distribution
+
+spatstat uses `Gest(ppp)` function to test for this
+
+### Ripley's K function
+
+Stands for Ripley reduced second moment measure
+
+K is the number of expected expected events to be found at a given distance from an event scaled by the intensity. To estimate it for some distance d, visit each event in turn, and count the number of other events in a circle of radius d, take the average, and thats the k of d. Do that for a number of values of d, and you can plot the function. For a completely spatial random process, this gives k of d = pi*d*\*2
+
+This is called Monte carlo

@@ -149,3 +149,37 @@ Stands for Ripley reduced second moment measure
 K is the number of expected expected events to be found at a given distance from an event scaled by the intensity. To estimate it for some distance d, visit each event in turn, and count the number of other events in a circle of radius d, take the average, and thats the k of d. Do that for a number of values of d, and you can plot the function. For a completely spatial random process, this gives k of d = pi*d*\*2
 
 This is called Monte carlo
+
+# **Nearest-neighbor distributions**
+
+This is another way of assessing clustering and regularity. It does so by considering each point and how it relates to the other points. One simple feature is the distribution of of distances from each point to its nearest neighbor.
+
+The `nndist()` function in spatstat takes a point pattern and for each point returns the distance to its nearest neighbor. You can then plot the histogram.
+
+Instead of working with the nearest neighbor density, as seen in the histogram, it can be easier to work with the cumulative distribution function, `G(r)` this is the probability of a point having a nearest neighbor within a distance r
+
+For a uniform poisson proecess, G can be computed theoretically, and is `G(r) = 1 - exp( - lambda * pi * r ^ 2)` You can compute G empirically from your data using `Gest()` and so compare with the theoretical value
+
+Events near the edge of the window might have had a nearest nearest neighbor outside the window, and so unobserved. This will make the distance to its observed nearest neighbor larger than expected, biasing the estimate of G. There are several methods for correcting this bias.
+
+Plotting the output from `Gest()` shows the theoretical cumulative distribution and several estimates of the cumulative distribution using different edge corrections. Often these edge corrections are almost indistinguishable. and the lines overlap. The plot can be used as quick exploratory test of complete spatial randomness.
+
+```{r}
+# Using ppois and p_regular defined previously
+
+# Calculate nearest neighbor distances for poison
+nnd_poisson <- nndist(ppois)
+
+# draw histogram of nearest-neighbor distances
+hist(nnd_poison)
+# Estimate G(r)
+G_poisson <- Gest(ppois)
+plot(G_poisson)
+```
+
+```{r}
+nnd_regular <- nndist(ppois)
+plot(nnd_regular)
+G_regular <- Gest(p_regular)
+plot(G_regular)
+```

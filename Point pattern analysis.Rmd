@@ -1,0 +1,15 @@
+---
+title: "Point pattern analysis"
+output: html_notebook
+---
+
+```{r}
+library(spatstat)
+preston_crime <- readRDS("data/pcrime-spatstat.rds")
+summary(preston_crime)
+```
+
+```{r}
+table(marks(preston_crime))
+# Define a function to create a map
+```

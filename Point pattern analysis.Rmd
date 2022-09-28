@@ -11,5 +11,151 @@ summary(preston_crime)
 
 ```{r}
 table(marks(preston_crime))
+preston_osm <- readRDS("data/osm_preston_gray.rds")
 # Define a function to create a map
+preston_map <- function(cols=c("green", "red"),
+                        cex = c(1, 1), pch=c(1,1)) {
+  plotRGB(preston_osm)
+  plot(preston_crime, cols = cols, pch = pch, cex = cex, add = TRUE, show.window =TRUE)
+}
+
+preston_map(
+  cols = c("black", "red"),
+  cex = c(0.5, 1),
+  pch = c(19, 19)
+)
+```
+
+### Violent crime proportion estimation
+
+One method of computing a smooth intensity surface from a set of points is to use kernel smoothing. Imagine replacing each point with a dot of ink on an absorbent paper. Each individual ink drop spreads out into a patch with a dark center, and multiple drops add together and make the paper even darker. With the right amount of ink in each drop, and with paper of the right absorbency, you can create a fair impression of the density of the original points. In kernel smoothing jargon, this means computing a bandwidth and using a particular kernel function.
+
+To get a smooth map of violent crimes proportion, we can estimate the intensity surface for violent and non-violent crimes, and take the ratio. To do this with the `density()` function function in `spatstat`. We have to split the points according to the two values of the marks and then compute the ratio of the violent crime surface to the total. The function has sensible defaults for the kernel function and bandwidth to guarantee something that looks at least plausible.
+
+```{r}
+crime_splits <- split(preston_crime)
+plot(crime_splits)
+crime_densities <- density(crime_splits)
+
+# Calculate the density of the fraction of violent crimes
+frac_violent_crime_density <- crime_densities[["Violent crime"]]/(crime_densities[["Non-violent crime"]] + crime_densities[["Violent crime"]])
+plot(frac_violent_crime_density)
+```
+
+### Bandwidth selection
+
+We can get a more principled measure of the violent crime ration using spatial segregation model. The `spatialkernel` package implements the theory of spatial segregation.
+
+The first step is to compute the optimal bandwidth for kernel smoothing under the segregation model. A small bandwidth would result in a density that is mostly zero, with spikes at the event locations. A large bandwidth would flatten out any structure in the events, resulting in a large "blob" across these extremes in a bandwidth that best represents an underlying density for the process.
+
+`spseg()` will scan over a range of bandwidths that maximizes this test statistic is the one to use. The returned value from `speg()` in this case is a list, this h and `cv` elements giving the values of the statistic over the input h values. the `spatialkernel` package supplies a `plotcv` function to show how the test value varies. the `hcv` element has the value of the best bandwidth.
+
+```{r}
+# library(spatialkernel)
+bw_choice <- spseg(
+  preston_crime,
+  h = seq(500, 1000, by=50),
+  opt = 1
+)
+bw_choice
+plotcv(bw_choice); abline(v = bw_choice$hcv, lty = 2, col = "red")
+```
+
+### Segregation probabilities
+
+The second step is to compute the probabilities for violent and non-violent crimes as a smooth surface, as well as the p-values for a point-wise test of segregation. This is done by calling spseg() with opt = 3 and a fixed bandwidth parameter h.
+
+Normally you would run this process for at least 100 simulations, but that will take too long to run here. Instead, run for only 10 simulations. Then you can use a pre-loaded object seg which is the output from a 1000 simulation run that took about 20 minutes to complete.
+
+```{r}
+# Set the correct bandwidth and run for 10 simulations only
+seg10 <- spseg(
+    pts = preston_crime, 
+    h = bw_choice$hcv,
+    opt = 3,
+    ntest = 10, 
+    proc = FALSE)
+# Plot the segregation map for violent crime
+plotmc(seg10, "Violent crime")
+
+# Plot seg, the result of running 1000 simulations
+plotmc(seg, "Violent crime")
+```
+
+# **Mapping segregation**
+
+\
+With a base map and some image and contour functions we can display both the probabilities and the significance tests over the area with more control than the `plotmc()` function.
+
+The `seg` object is a list with several components. The X and Y coordinates of the grid are stored in the `$gridx` and `$gridy` elements. The probabilities of each class of data (violent or non-violent crime) are in a matrix element `$p` with a column for each class. The p-value of the significance test is in a similar matrix element called `$stpvalue`. Rearranging columns of these matrices into a grid of values can be done with R's `matrix()` function. From there you can construct list objects with a vector `$x` of X-coordinates, `$y` of Y-coordinates, and `$z` as the matrix. You can then feed this to `image()` or `contour()` for visualization.
+
+This process may seem complex, but remember that with R you can always write functions to perform complex tasks and those you may repeat often. For example, to help with the mapping in this exercise you will create a function that builds a map from four different items.
+
+The `seg` object from 1000 simulations is loaded, as well as the `preston_crime` points and the `preston_osm` map image.
+
+```{r}
+# Inspect the structure of the spatial segregation object
+str(seg)
+
+# Get the number of columns in the data so we can rearrange to a grid
+ncol <- length(seg$x)
+
+```
+
+Create `prob_violent` as a list with - `x` as the `gridx` element of `seg`. - `y` as the `gridy` element. - `z` as a matrix with the `"violent crime"` column of the `p` element.
+
+```{r}
+# Inspect the structure of the spatial segregation object
+str(seg)
+
+# Get the number of columns in the data so we can rearrange to a grid
+ncol <- length(seg$gridx)
+
+# Rearrange the probability column into a grid
+prob_violent <- list(x = seg$gridx,
+                     y = seg$gridy,
+                     z = matrix(seg$p[, "Violent crime"],
+                                ncol = ncol))
+image(prob_violent)
+
+```
+
+Create `p_value` as in the previous step, except that the `z` element is logical, and `TRUE` when the `stpvalue` element of `seg` is less than 0.05.
+
+\
+
+```{r}
+
+# Rearrange the p-values, but choose a p-value threshold
+p_value <- list(x = seg$gridx,
+                y = seg$gridy,
+                z = matrix(seg$stpvalue[, "Violent crime"] < 0.05,ncol = ncol))
+image(p_value)
+```
+
+```{r}
+# Create a mapping function
+segmap <- function(prob_list, pv_list, low, high){
+
+  # background map
+  plotRGB(preston_osm)
+
+  # p-value areas
+  image(pv_list, 
+        col = c("#00000000", "#FF808080"), add = TRUE) 
+
+  # probability contours
+  contour(prob_list,
+          levels = c(low, high),
+          col = c("#206020", "red"),
+          labels = c("Low", "High"),
+          add = TRUE)
+
+  # boundary window
+  plot(Window(preston_crime), add = TRUE)
+}
+
+# Map the probability and p-value
+segmap(prob_violent, p_value, 0.05, 0.15)
+
 ```
